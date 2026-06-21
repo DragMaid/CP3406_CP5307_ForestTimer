@@ -59,6 +59,13 @@ class ForestViewModel(application: Application) : AndroidViewModel(application) 
     private val _completedSessionDates = MutableStateFlow(prefs.loadCompletedSessions())
     val completedSessionDates = _completedSessionDates.asStateFlow()
 
+    // Weather State
+    private val _weatherCondition = MutableStateFlow(WeatherCondition.SUNNY)
+    val weatherCondition = _weatherCondition.asStateFlow()
+
+    private val _isFetchingWeather = MutableStateFlow(false)
+    val isFetchingWeather = _isFetchingWeather.asStateFlow()
+
     private var timerJob: Job? = null
 
     init {
@@ -422,5 +429,49 @@ class ForestViewModel(application: Application) : AndroidViewModel(application) 
         val daysBetween = (diffMs / (1000 * 60 * 60 * 24)) + 1
 
         return dates.size.toDouble() / daysBetween
+    }
+
+    fun fetchWeather() {
+        if (_isFetchingWeather.value) return
+        _isFetchingWeather.value = true
+        viewModelScope.launch {
+            delay(1500)
+            val conditions = WeatherCondition.entries
+            _weatherCondition.value = conditions.random()
+            _isFetchingWeather.value = false
+        }
+    }
+
+    /**
+     * Attempt to fetch real-time weather using device location.
+     * For now this falls back to the simulated fetchWeather() when location
+     * access isn't available — keeps behaviour safe for builds without
+     * runtime permission handling. If location and network are available,
+     * one could plug in a real API call here.
+     */
+    fun fetchWeatherRealTime() {
+        if (_isFetchingWeather.value) return
+        _isFetchingWeather.value = true
+        viewModelScope.launch {
+            // TODO: integrate real location + forecast API. Simulate for now.
+            delay(1200)
+            val conditions = WeatherCondition.entries
+            _weatherCondition.value = conditions.random()
+            _isFetchingWeather.value = false
+        }
+    }
+
+    fun setWeather(condition: WeatherCondition) {
+        _weatherCondition.value = condition
+    }
+
+    /**
+     * Skip the current session (works for both focus and break sessions).
+     */
+    fun skipCurrentSession() {
+        timerJob?.cancel()
+        _isTimerRunning.value = false
+        _isTimerPaused.value = false
+        onSessionComplete()
     }
 }

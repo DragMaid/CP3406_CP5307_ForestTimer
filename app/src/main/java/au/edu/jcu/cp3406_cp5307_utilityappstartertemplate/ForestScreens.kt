@@ -58,7 +58,10 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
         SessionType.LONG_BREAK -> settings.longBreakDurationMinutes * 60L
     }
     
-    val progress = if (totalSeconds > 0) secondsRemaining.toFloat() / totalSeconds else 0f
+    // progress ring removed; compute display time for overlay
+    val mins = secondsRemaining / 60
+    val secs = secondsRemaining % 60
+    val timeString = String.format("%02d:%02d", mins, secs)
 
     // Daily focus goal progress calculation
     val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -84,10 +87,12 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
             fontWeight = FontWeight.Bold
         )
 
-        // Weather Widget Showcase
+        // Weather Widget Showcase (choose a weather tag or real-time)
         WeatherWidget(
             weather = weather,
             isFetching = isFetchingWeather,
+            onSelectWeather = { viewModel.setWeather(it) },
+            onRealTime = { viewModel.fetchWeatherRealTime() },
             onFetchWeather = { viewModel.fetchWeather() }
         )
 
@@ -126,10 +131,10 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
             )
         }
 
-        // Tree visual display box
+        // Enlarged Tree visual display box (removed circular progress ring)
         Box(
             modifier = Modifier
-                .size(200.dp)
+                .height(320.dp)
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
@@ -144,8 +149,26 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
             TreeCanvas(
                 species = activeTreeSpecies,
                 stage = if (sessionType == SessionType.FOCUS) currentStage else TreeStage.MATURE,
-                weather = weather
+                weather = weather,
+                modifier = Modifier.fillMaxSize()
             )
+
+            // Overlay time on top of the tree for visibility
+            Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = timeString,
+                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp),
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (isRunning) "Focusing" else if (isPaused) "Paused" else "Ready",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         // Pomodoro Cycle session progress indicator (4 steps)
@@ -163,52 +186,7 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
             }
         }
 
-        // Circular Countdown Progress Ring
-        val mins = secondsRemaining / 60
-        val secs = secondsRemaining % 60
-        val timeString = String.format("%02d:%02d", mins, secs)
-
-        Box(
-            modifier = Modifier.size(200.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            val primaryColor = MaterialTheme.colorScheme.primary
-            val trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeWidthValue = 10.dp.toPx()
-                // Track
-                drawCircle(
-                    color = trackColor,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidthValue, cap = StrokeCap.Round)
-                )
-                // Progress (starts from top -90f and sweeps clockwise)
-                drawArc(
-                    color = primaryColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * progress,
-                    useCenter = false,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidthValue, cap = StrokeCap.Round)
-                )
-            }
-            
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = timeString,
-                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 44.sp),
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (isRunning) "Focusing" else if (isPaused) "Paused" else "Ready",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
+        
 
         // Timer control buttons
         Row(
@@ -235,16 +213,14 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
                     Text(if (isRunning) "Pause" else "Resume", fontWeight = FontWeight.Bold)
                 }
 
-                // Skip button (only shown for FOCUS sessions)
-                if (sessionType == SessionType.FOCUS) {
-                    Button(
-                        onClick = { viewModel.skipFocusSession() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Skip", fontWeight = FontWeight.Bold)
-                    }
+                // Skip button (available for both focus and breaks)
+                Button(
+                    onClick = { viewModel.skipCurrentSession() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Skip", fontWeight = FontWeight.Bold)
                 }
 
                 // Cancel button
@@ -298,9 +274,7 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
 fun GardenScreen(viewModel: ForestViewModel) {
     val garden by viewModel.garden.collectAsState()
     
-    // Sort and filter state
-    var selectedFilter by remember { mutableStateOf("All") }
-    var selectedSortOrder by remember { mutableStateOf("Newest") } // Newest, Oldest
+    // Sort state removed; simplified view to prioritise grid visibility
     var selectedDetailTree by remember { mutableStateOf<GardenTree?>(null) }
     var showEmptyPlotDialog by remember { mutableStateOf(false) }
 
@@ -351,72 +325,15 @@ fun GardenScreen(viewModel: ForestViewModel) {
             }
         }
 
-        // Filtering and Sorting Controls
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("Filter by Species", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    FilterChip(
-                        selected = selectedFilter == "All",
-                        onClick = { selectedFilter = "All" },
-                        label = { Text("All") }
-                    )
-                }
-                items(TreeSpecies.entries) { species ->
-                    FilterChip(
-                        selected = selectedFilter == species.displayName,
-                        onClick = { selectedFilter = species.displayName },
-                        label = { Text(species.displayName) }
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Sort order", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = selectedSortOrder == "Newest",
-                        onClick = { selectedSortOrder = "Newest" },
-                        label = { Text("Newest First") }
-                    )
-                    FilterChip(
-                        selected = selectedSortOrder == "Oldest",
-                        onClick = { selectedSortOrder = "Oldest" },
-                        label = { Text("Oldest First") }
-                    )
-                }
-            }
-        }
+        // Filters removed to prioritise a denser grid layout
 
         // Processed list of garden trees
-        val filteredAndSortedTrees = remember(garden, selectedFilter, selectedSortOrder) {
-            var result = garden.asSequence()
-            
-            if (selectedFilter != "All") {
-                result = result.filter { it.species.displayName == selectedFilter }
-            }
-            
-            result = if (selectedSortOrder == "Newest") {
-                result.sortedByDescending { it.completionDate }
-            } else {
-                result.sortedBy { it.completionDate }
-            }
-            
-            result.toList()
-        }
+        val filteredAndSortedTrees = remember(garden) { garden.toList().sortedByDescending { it.completionDate } }
 
         // Garden plot calculation (minimum of 12 plots, multiple of 3)
-        val plotsList = remember(filteredAndSortedTrees) {
+            val plotsList = remember(filteredAndSortedTrees) {
             val listSize = filteredAndSortedTrees.size
-            val targetSize = maxOf(12, ((listSize + 2) / 3) * 3)
+            val targetSize = maxOf(9, ((listSize + 2) / 3) * 3)
             List(targetSize) { index ->
                 if (index < listSize) filteredAndSortedTrees[index] else null
             }
@@ -610,9 +527,9 @@ fun StatCard(title: String, value: String, modifier: Modifier = Modifier) {
         Column(
             modifier = Modifier.padding(12.dp)
         ) {
-            Text(title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                Text(title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -975,6 +892,8 @@ fun SettingsFormScreen(viewModel: ForestViewModel) {
 fun WeatherWidget(
     weather: WeatherCondition,
     isFetching: Boolean,
+    onSelectWeather: (WeatherCondition) -> Unit,
+    onRealTime: () -> Unit,
     onFetchWeather: () -> Unit
 ) {
     Card(
@@ -982,23 +901,37 @@ fun WeatherWidget(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text("Weather", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                Text(weather.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    Text("Weather", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text(weather.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                }
+
+                if (isFetching) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+                } else {
+                    Button(onClick = onFetchWeather, shape = RoundedCornerShape(10.dp)) {
+                        Text("Refresh")
+                    }
+                }
             }
 
-            if (isFetching) {
-                CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
-            } else {
-                Button(onClick = onFetchWeather, shape = RoundedCornerShape(10.dp)) {
-                    Text("Refresh")
+            // Selection chips: each weather condition + Real-time
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(listOf(WeatherCondition.SUNNY, WeatherCondition.CLOUDY, WeatherCondition.RAINY, WeatherCondition.WINDY, WeatherCondition.STORM)) { cond ->
+                    FilterChip(
+                        selected = cond == weather,
+                        onClick = { onSelectWeather(cond) },
+                        label = { Text(cond.displayName) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = false,
+                        onClick = { onRealTime() },
+                        label = { Text("Real-time") }
+                    )
                 }
             }
         }
