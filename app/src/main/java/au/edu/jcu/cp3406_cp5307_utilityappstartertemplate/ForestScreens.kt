@@ -148,8 +148,8 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
         ) {
             TreeCanvas(
                 species = activeTreeSpecies,
-                stage = if (sessionType == SessionType.FOCUS) currentStage else TreeStage.MATURE,
-                weather = weather,
+                stage = currentStage,
+                weather = weather
                 modifier = Modifier.fillMaxSize()
             )
 
