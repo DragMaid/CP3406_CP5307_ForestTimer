@@ -50,14 +50,32 @@ fun CP3406_CP5603UtilityAppStarterTemplateTheme(
     accentColorName: String = "Forest Green",
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val (primary, secondary, tertiary) = getAccentColors(accentColorName, darkTheme)
+    
+    val colorScheme = if (darkTheme) {
+        darkColorScheme(
+            primary = secondary,
+            secondary = primary,
+            tertiary = tertiary,
+            background = Color(0xFF121212),
+            surface = Color(0xFF1E1E1E),
+            onPrimary = Color.Black,
+            onSecondary = Color.White,
+            onBackground = Color(0xFFEEEEEE),
+            onSurface = Color(0xFFEEEEEE)
+        )
+    } else {
+        lightColorScheme(
+            primary = primary,
+            secondary = secondary,
+            tertiary = tertiary,
+            background = Color(0xFFFFFBFE),
+            surface = Color(0xFFFAFAFA),
+            onPrimary = Color.White,
+            onSecondary = Color.Black,
+            onBackground = Color(0xFF1C1B1F),
+            onSurface = Color(0xFF1C1B1F)
+        )
     }
 
     MaterialTheme(
