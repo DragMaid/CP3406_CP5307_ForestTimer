@@ -37,6 +37,23 @@ class AppPrefs(context: Context) {
     private val KEY_TIMER_SESSION_TYPE = "timer_session_type"
     private val KEY_TIMER_IS_PAUSED = "timer_is_paused"
 
+    fun loadSettings(): AppSettings {
+        return AppSettings(
+            displayName = prefs.getString(KEY_DISPLAY_NAME, "Grower") ?: "Grower",
+            themeMode = prefs.getString(KEY_THEME_MODE, "System") ?: "System",
+            accentColor = prefs.getString(KEY_ACCENT_COLOR, "Forest Green") ?: "Forest Green",
+            focusDurationMinutes = prefs.getInt(KEY_FOCUS_DURATION, 25),
+            shortBreakDurationMinutes = prefs.getInt(KEY_SHORT_BREAK, 5),
+            longBreakDurationMinutes = prefs.getInt(KEY_LONG_BREAK, 15),
+            autoStartBreak = prefs.getBoolean(KEY_AUTO_START_BREAK, false),
+            autoStartFocus = prefs.getBoolean(KEY_AUTO_START_FOCUS, false),
+            enableSounds = prefs.getBoolean(KEY_ENABLE_SOUNDS, true),
+            enableVibration = prefs.getBoolean(KEY_ENABLE_VIBRATION, true),
+            dailyFocusGoalMinutes = prefs.getInt(KEY_DAILY_FOCUS_GOAL, 100),
+            speciesMode = prefs.getString(KEY_SPECIES_MODE, "Random") ?: "Random",
+            selectedSpecies = TreeSpecies.fromString(prefs.getString(KEY_SELECTED_SPECIES, "OAK") ?: "OAK")
+        )
+    }
 
     fun saveSettings(settings: AppSettings) {
         prefs.edit()
