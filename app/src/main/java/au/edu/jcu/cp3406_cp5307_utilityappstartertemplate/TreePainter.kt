@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 
 // ponytail: Dynamic Canvas drawing with mathematical sway and particle calculations. Zero image files.
@@ -19,16 +20,29 @@ import androidx.compose.ui.unit.dp
 fun TreeCanvas(
     species: TreeSpecies,
     stage: TreeStage,
+    weather: WeatherCondition = WeatherCondition.SUNNY,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "TreeSway")
+
+    // Dynamic sway specs based on weather
+    val swayDuration = when (weather) {
+        WeatherCondition.WINDY -> 900
+        WeatherCondition.STORM -> 700
+        else -> 2500
+    }
+    val swayMaxAngle = when (weather) {
+        WeatherCondition.WINDY -> 6f
+        WeatherCondition.STORM -> 9f
+        else -> 1.5f
+    }
     
     // Smooth swaying animation to bring the trees to life
     val swayAngle by infiniteTransition.animateFloat(
-        initialValue = -1.5f,
-        targetValue = 1.5f,
+        initialValue = -swayMaxAngle,
+        targetValue = swayMaxAngle,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2500, easing = EaseInOutQuad),
+            animation = tween(durationMillis = swayDuration, easing = EaseInOutQuad),
             repeatMode = RepeatMode.Reverse
         ),
         label = "sway"
@@ -45,12 +59,88 @@ fun TreeCanvas(
         label = "petals"
     )
 
+    // Falling rain animation
+    val rainProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rain"
+    )
+
+    // Occasional thunder flash for storms
+    val thunderAlpha by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 8000
+                0.0f at 0
+                0.0f at 5000
+                0.8f at 5100
+                0.0f at 5200
+                0.9f at 5300
+                0.0f at 5500
+                0.0f at 8000
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "thunder"
+    )
+
     Canvas(modifier = modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
         val groundY = height - 24.dp.toPx()
         val centerX = width / 2f
 
+        // --- LAYER 1: SKY (Sun and Clouds) ---
+        if (weather == WeatherCondition.SUNNY) {
+            val sunRadius = 14.dp.toPx()
+            val sunCenter = Offset(width - 24.dp.toPx(), 24.dp.toPx())
+            drawCircle(
+                color = Color(0xFFFBC02D),
+                radius = sunRadius,
+                center = sunCenter
+            )
+            for (i in 0 until 8) {
+                val angle = i * 45
+                val rad = Math.toRadians(angle.toDouble())
+                val startX = sunCenter.x + (sunRadius + 3.dp.toPx()) * Math.cos(rad).toFloat()
+                val startY = sunCenter.y + (sunRadius + 3.dp.toPx()) * Math.sin(rad).toFloat()
+                val endX = sunCenter.x + (sunRadius + 8.dp.toPx()) * Math.cos(rad).toFloat()
+                val endY = sunCenter.y + (sunRadius + 8.dp.toPx()) * Math.sin(rad).toFloat()
+                drawLine(
+                    color = Color(0xFFFBC02D),
+                    start = Offset(startX, startY),
+                    end = Offset(endX, endY),
+                    strokeWidth = 2.dp.toPx()
+                )
+            }
+        }
+
+        if (weather == WeatherCondition.CLOUDY || weather == WeatherCondition.STORM) {
+            val cloudColor = if (weather == WeatherCondition.STORM) Color(0xFF78909C) else Color(0xFFECEFF1)
+            // Left Cloud
+            val c1x = 20.dp.toPx()
+            val c1y = 20.dp.toPx()
+            drawCircle(cloudColor, 10.dp.toPx(), Offset(c1x, c1y))
+            drawCircle(cloudColor, 14.dp.toPx(), Offset(c1x + 10.dp.toPx(), c1y - 3.dp.toPx()))
+            drawCircle(cloudColor, 10.dp.toPx(), Offset(c1x + 20.dp.toPx(), c1y))
+            drawRect(cloudColor, Offset(c1x, c1y - 3.dp.toPx()), Size(20.dp.toPx(), 13.dp.toPx()))
+
+            // Right Cloud
+            val c2x = width - 60.dp.toPx()
+            val c2y = 25.dp.toPx()
+            drawCircle(cloudColor, 8.dp.toPx(), Offset(c2x, c2y))
+            drawCircle(cloudColor, 12.dp.toPx(), Offset(c2x + 8.dp.toPx(), c2y - 2.dp.toPx()))
+            drawCircle(cloudColor, 8.dp.toPx(), Offset(c2x + 16.dp.toPx(), c2y))
+            drawRect(cloudColor, Offset(c2x, c2y - 2.dp.toPx()), Size(16.dp.toPx(), 10.dp.toPx()))
+        }
+
+        // --- LAYER 2: GROUND & TREE ---
         // Draw Soil / Ground Line
         drawRect(
             color = Color(0xFF6D4C41),
@@ -370,6 +460,46 @@ fun TreeCanvas(
                     }
                 }
             }
+        }
+
+        // --- LAYER 3: WEATHER EFFECTS (Rain, Wind, Thunder) ---
+        if (weather == WeatherCondition.RAINY || weather == WeatherCondition.STORM) {
+            val rainColor = Color(0x9990CAF9)
+            val rainCount = 12
+            for (i in 0 until rainCount) {
+                val xOffset = (i * (width / rainCount))
+                val yStart = (rainProgress * height + (i * 17) % height) % height
+                val yEnd = yStart + 10.dp.toPx()
+                drawLine(
+                    color = rainColor,
+                    start = Offset(xOffset - 3.dp.toPx(), yStart),
+                    end = Offset(xOffset, yEnd),
+                    strokeWidth = 1.5f.dp.toPx()
+                )
+            }
+        }
+
+        if (weather == WeatherCondition.WINDY) {
+            val windColor = Color(0x66B0BEC5)
+            for (w in 0..1) {
+                val windY = groundY - 35.dp.toPx() - (w * 30.dp.toPx())
+                val windX = (rainProgress * width * 1.5f) - (width * 0.25f)
+                drawLine(
+                    color = windColor,
+                    start = Offset(windX - 25.dp.toPx(), windY),
+                    end = Offset(windX, windY),
+                    strokeWidth = 2.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+
+        if (weather == WeatherCondition.STORM && thunderAlpha > 0.1f) {
+            drawRect(
+                color = Color(0xFFFFFDE7).copy(alpha = thunderAlpha * 0.25f),
+                topLeft = Offset(0f, 0f),
+                size = Size(width, height)
+            )
         }
     }
 }
