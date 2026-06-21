@@ -22,6 +22,8 @@ class AppPrefs(context: Context) {
     private val KEY_DAILY_FOCUS_GOAL = "pref_daily_goal"
     private val KEY_SPECIES_MODE = "pref_species_mode"
     private val KEY_SELECTED_SPECIES = "pref_selected_species"
+    private val KEY_SELECTED_WEATHER = "pref_selected_weather"
+    private val KEY_WEATHER_MODE = "pref_weather_mode"
 
     // State Keys
     private val KEY_GARDEN = "state_garden"
@@ -51,7 +53,13 @@ class AppPrefs(context: Context) {
             enableVibration = prefs.getBoolean(KEY_ENABLE_VIBRATION, true),
             dailyFocusGoalMinutes = prefs.getInt(KEY_DAILY_FOCUS_GOAL, 100),
             speciesMode = prefs.getString(KEY_SPECIES_MODE, "Random") ?: "Random",
-            selectedSpecies = TreeSpecies.fromString(prefs.getString(KEY_SELECTED_SPECIES, "OAK") ?: "OAK")
+            selectedSpecies = TreeSpecies.fromString(prefs.getString(KEY_SELECTED_SPECIES, "OAK") ?: "OAK"),
+            selectedWeather = try {
+                WeatherCondition.valueOf(prefs.getString(KEY_SELECTED_WEATHER, WeatherCondition.SUNNY.name) ?: WeatherCondition.SUNNY.name)
+            } catch (_: Exception) {
+                WeatherCondition.SUNNY
+            },
+            weatherMode = prefs.getString(KEY_WEATHER_MODE, "Manual") ?: "Manual"
         )
     }
 
@@ -69,7 +77,9 @@ class AppPrefs(context: Context) {
             .putBoolean(KEY_ENABLE_VIBRATION, settings.enableVibration)
             .putInt(KEY_DAILY_FOCUS_GOAL, settings.dailyFocusGoalMinutes)
             .putString(KEY_SPECIES_MODE, settings.speciesMode)
-            .putString(KEY_SELECTED_SPECIES, settings.selectedSpecies.name)
+                .putString(KEY_SELECTED_SPECIES, settings.selectedSpecies.name)
+                .putString(KEY_SELECTED_WEATHER, settings.selectedWeather.name)
+                .putString(KEY_WEATHER_MODE, settings.weatherMode)
             .apply()
     }
 

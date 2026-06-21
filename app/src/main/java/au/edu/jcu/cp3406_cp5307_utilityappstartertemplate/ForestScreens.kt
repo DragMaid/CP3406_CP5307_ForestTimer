@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -87,13 +89,10 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
             fontWeight = FontWeight.Bold
         )
 
-        // Weather Widget Showcase (choose a weather tag or real-time)
+        // Weather Widget Showcase (display only; selection moved to Settings)
         WeatherWidget(
             weather = weather,
-            isFetching = isFetchingWeather,
-            onSelectWeather = { viewModel.setWeather(it) },
-            onRealTime = { viewModel.fetchWeatherRealTime() },
-            onFetchWeather = { viewModel.fetchWeather() }
+            isFetching = isFetchingWeather
         )
 
         // Session Type Header
@@ -149,7 +148,7 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
             TreeCanvas(
                 species = activeTreeSpecies,
                 stage = currentStage,
-                weather = weather
+                weather = weather,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -563,8 +562,18 @@ fun SettingsFormScreen(viewModel: ForestViewModel) {
     var dailyGoal by remember { mutableStateOf(currentSettings.dailyFocusGoalMinutes.toString()) }
     var speciesMode by remember { mutableStateOf(currentSettings.speciesMode) }
     var selectedSpecies by remember { mutableStateOf(currentSettings.selectedSpecies) }
+    var selectedWeather by remember { mutableStateOf(currentSettings.selectedWeather) }
+    var weatherMode by remember { mutableStateOf(currentSettings.weatherMode) }
 
     var saveSuccessMessage by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->
+        val fine = perms[android.Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarse = perms[android.Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (fine || coarse) {
+            viewModel.fetchWeatherRealTime()
+        }
+    }
 
     // Validation Results
     val focusDurationVal = focusDuration.toIntOrNull() ?: 0
@@ -765,6 +774,60 @@ fun SettingsFormScreen(viewModel: ForestViewModel) {
             }
         }
 
+        // Weather preference (moved from focus screen)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Weather Preference", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+
+            // Weather Mode (Manual or Real-time)
+            var weatherModeExpanded by remember { mutableStateOf(false) }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = weatherMode,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Weather Mode") },
+                    trailingIcon = {
+                        IconButton(onClick = { weatherModeExpanded = true }) { Icon(Icons.Default.Info, contentDescription = "Choose Weather Mode") }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                DropdownMenu(expanded = weatherModeExpanded, onDismissRequest = { weatherModeExpanded = false }) {
+                    listOf("Manual", "Real-time").forEach { mode ->
+                        DropdownMenuItem(text = { Text(mode) }, onClick = {
+                            weatherMode = mode
+                            weatherModeExpanded = false
+                        })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Selected weather (manual selection)
+            var weatherExpanded by remember { mutableStateOf(false) }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = selectedWeather.displayName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Selected Weather") },
+                    trailingIcon = {
+                        IconButton(onClick = { weatherExpanded = true }) { Icon(Icons.Default.Info, contentDescription = "Choose Weather") }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                DropdownMenu(expanded = weatherExpanded, onDismissRequest = { weatherExpanded = false }) {
+                    listOf(WeatherCondition.SUNNY, WeatherCondition.CLOUDY, WeatherCondition.RAINY, WeatherCondition.WINDY, WeatherCondition.STORM).forEach { w ->
+                        DropdownMenuItem(text = { Text(w.displayName) }, onClick = {
+                            selectedWeather = w
+                            viewModel.setWeather(w)
+                            weatherExpanded = false
+                        })
+                    }
+                }
+            }
+        }
+
         // Species Mode & Goals
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -860,9 +923,15 @@ fun SettingsFormScreen(viewModel: ForestViewModel) {
                         enableVibration = enableVibration,
                         dailyFocusGoalMinutes = dailyGoalVal,
                         speciesMode = speciesMode,
-                        selectedSpecies = selectedSpecies
+                        selectedSpecies = selectedSpecies,
+                        selectedWeather = selectedWeather,
+                        weatherMode = weatherMode
                     )
                     viewModel.updateSettings(updated)
+                    // If user chose Real-time, request location permissions to trigger initial fetch
+                    if (weatherMode == "Real-time") {
+                        permissionLauncher.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+                    }
                     saveSuccessMessage = true
                 }
             },
@@ -891,48 +960,20 @@ fun SettingsFormScreen(viewModel: ForestViewModel) {
 @Composable
 fun WeatherWidget(
     weather: WeatherCondition,
-    isFetching: Boolean,
-    onSelectWeather: (WeatherCondition) -> Unit,
-    onRealTime: () -> Unit,
-    onFetchWeather: () -> Unit
+    isFetching: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Column {
-                    Text("Weather", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    Text(weather.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                }
-
-                if (isFetching) {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
-                } else {
-                    Button(onClick = onFetchWeather, shape = RoundedCornerShape(10.dp)) {
-                        Text("Refresh")
-                    }
-                }
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column {
+                Text("Weather", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Text(weather.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             }
-
-            // Selection chips: each weather condition + Real-time
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf(WeatherCondition.SUNNY, WeatherCondition.CLOUDY, WeatherCondition.RAINY, WeatherCondition.WINDY, WeatherCondition.STORM)) { cond ->
-                    FilterChip(
-                        selected = cond == weather,
-                        onClick = { onSelectWeather(cond) },
-                        label = { Text(cond.displayName) }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = false,
-                        onClick = { onRealTime() },
-                        label = { Text("Real-time") }
-                    )
-                }
+            if (isFetching) {
+                CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
             }
         }
     }
