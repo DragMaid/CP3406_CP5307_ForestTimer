@@ -45,6 +45,27 @@ fun TreeCanvas(
         // Sway pivot point is the base of the trunk at the ground level
         val pivot = Offset(centerX, groundY)
 
+                    if (species == TreeSpecies.PINE) {
+                        // Pine triangles
+                        val path = Path().apply {
+                            moveTo(centerX, groundY - trunkHeight - 20.dp.toPx())
+                            lineTo(centerX - 30.dp.toPx(), groundY - trunkHeight + 10.dp.toPx())
+                            lineTo(centerX + 30.dp.toPx(), groundY - trunkHeight + 10.dp.toPx())
+                            close()
+                            
+                            moveTo(centerX, groundY - trunkHeight)
+                            lineTo(centerX - 24.dp.toPx(), groundY - trunkHeight + 25.dp.toPx())
+                            lineTo(centerX + 24.dp.toPx(), groundY - trunkHeight + 25.dp.toPx())
+                            close()
+                        }
+                        drawPath(path, foliageColor)
+                    } else {
+                        // Standard tree cloud
+                        drawCircle(foliageColor, 30.dp.toPx(), Offset(centerX, groundY - trunkHeight - 12.dp.toPx()))
+                        drawCircle(foliageColor, 22.dp.toPx(), Offset(centerX - 20.dp.toPx(), groundY - trunkHeight - 8.dp.toPx()))
+                        drawCircle(foliageColor, 22.dp.toPx(), Offset(centerX + 20.dp.toPx(), groundY - trunkHeight - 8.dp.toPx()))
+                    }
+                }
 
                 TreeStage.MATURE -> {
                     // Thick trunk
