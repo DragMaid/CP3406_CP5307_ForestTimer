@@ -89,12 +89,6 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
             fontWeight = FontWeight.Bold
         )
 
-        // Weather Widget Showcase (display only; selection moved to Settings)
-        WeatherWidget(
-            weather = weather,
-            isFetching = isFetchingWeather
-        )
-
         // Session Type Header
         Card(
             colors = CardDefaults.cardColors(
