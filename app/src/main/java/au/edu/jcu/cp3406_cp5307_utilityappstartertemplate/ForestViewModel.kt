@@ -113,6 +113,15 @@ class ForestViewModel(application: Application) : AndroidViewModel(application) 
         prefs.saveTimerState(null)
     }
 
+    fun skipFocusSession() {
+        if (_sessionType.value == SessionType.FOCUS) {
+            timerJob?.cancel()
+            _isTimerRunning.value = false
+            _isTimerPaused.value = false
+            onSessionComplete()
+        }
+    }
+
     private fun onSessionComplete() {
         timerJob?.cancel()
         _isTimerRunning.value = false

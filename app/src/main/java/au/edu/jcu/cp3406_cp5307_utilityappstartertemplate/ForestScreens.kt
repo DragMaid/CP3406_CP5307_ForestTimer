@@ -3,6 +3,7 @@ package au.edu.jcu.cp3406_cp5307_utilityappstartertemplate
 import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -27,6 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.Date
@@ -115,7 +120,7 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
         // Tree visual display box
         Box(
             modifier = Modifier
-                .size(240.dp)
+                .size(200.dp)
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
@@ -148,70 +153,95 @@ fun ForestTimerScreen(viewModel: ForestViewModel) {
             }
         }
 
-        // Large Countdown Timer
+        // Circular Countdown Progress Ring
         val mins = secondsRemaining / 60
         val secs = secondsRemaining % 60
         val timeString = String.format("%02d:%02d", mins, secs)
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier.size(200.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = timeString,
-                style = MaterialTheme.typography.headlineLarge.copy(fontSize = 64.sp),
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.primary
-            )
+            val primaryColor = MaterialTheme.colorScheme.primary
+            val trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidthValue = 10.dp.toPx()
+                // Track
+                drawCircle(
+                    color = trackColor,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidthValue, cap = StrokeCap.Round)
+                )
+                // Progress (starts from top -90f and sweeps clockwise)
+                drawArc(
+                    color = primaryColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * progress,
+                    useCenter = false,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidthValue, cap = StrokeCap.Round)
+                )
+            }
             
-            // Subtle circular progress representation
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .width(200.dp)
-                    .height(6.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                strokeCap = StrokeCap.Round
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = timeString,
+                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 44.sp),
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (isRunning) "Focusing" else if (isPaused) "Paused" else "Ready",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         // Timer control buttons
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (!isRunning && !isPaused) {
                 Button(
                     onClick = { viewModel.startTimer() },
-                    modifier = Modifier.width(140.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Start Focus", fontWeight = FontWeight.Bold)
+                    Text(if (sessionType == SessionType.FOCUS) "Start Focus" else "Start Break", fontWeight = FontWeight.Bold)
                 }
             } else {
-                if (isRunning) {
+                // Pause/Resume button
+                Button(
+                    onClick = { if (isRunning) viewModel.pauseTimer() else viewModel.resumeTimer() },
+                    modifier = Modifier.weight(1f),
+                    colors = if (isRunning) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary) else ButtonDefaults.buttonColors(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(if (isRunning) "Pause" else "Resume", fontWeight = FontWeight.Bold)
+                }
+
+                // Skip button (only shown for FOCUS sessions)
+                if (sessionType == SessionType.FOCUS) {
                     Button(
-                        onClick = { viewModel.pauseTimer() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        modifier = Modifier.width(110.dp),
+                        onClick = { viewModel.skipFocusSession() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Pause", fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    Button(
-                        onClick = { viewModel.resumeTimer() },
-                        modifier = Modifier.width(110.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Resume", fontWeight = FontWeight.Bold)
+                        Text("Skip", fontWeight = FontWeight.Bold)
                     }
                 }
 
+                // Cancel button
                 OutlinedButton(
                     onClick = { viewModel.cancelSession() },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.width(110.dp),
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("Cancel", fontWeight = FontWeight.Bold)
@@ -262,6 +292,7 @@ fun GardenScreen(viewModel: ForestViewModel) {
     var selectedFilter by remember { mutableStateOf("All") }
     var selectedSortOrder by remember { mutableStateOf("Newest") } // Newest, Oldest
     var selectedDetailTree by remember { mutableStateOf<GardenTree?>(null) }
+    var showEmptyPlotDialog by remember { mutableStateOf(false) }
 
     // Statistics calculations
     val totalTrees = viewModel.totalMatureTreesCount
@@ -372,47 +403,49 @@ fun GardenScreen(viewModel: ForestViewModel) {
             result.toList()
         }
 
-        if (filteredAndSortedTrees.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No trees in this section yet.\nComplete focus sessions to populate your garden!",
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+        // Garden plot calculation (minimum of 12 plots, multiple of 3)
+        val plotsList = remember(filteredAndSortedTrees) {
+            val listSize = filteredAndSortedTrees.size
+            val targetSize = maxOf(12, ((listSize + 2) / 3) * 3)
+            List(targetSize) { index ->
+                if (index < listSize) filteredAndSortedTrees[index] else null
             }
-        } else {
+        }
+
+        // Visual Garden Meadows
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF4CAF50).copy(alpha = 0.08f),
+                            Color(0xFF2E7D32).copy(alpha = 0.12f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(24.dp)
+                )
+                .padding(12.dp)
+        ) {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                columns = GridCells.Fixed(3),
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(4.dp)
             ) {
-                items(filteredAndSortedTrees) { tree ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedDetailTree = tree },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(modifier = Modifier.size(80.dp)) {
-                                TreeCanvas(species = tree.species, stage = TreeStage.MATURE)
+                items(plotsList) { plotItem ->
+                    GardenPlot(
+                        tree = plotItem,
+                        onClick = {
+                            if (plotItem != null) {
+                                selectedDetailTree = plotItem
+                            } else {
+                                showEmptyPlotDialog = true
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(tree.species.displayName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                            Text(tree.completionDate, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                         }
-                    }
+                    )
                 }
             }
         }
@@ -468,6 +501,89 @@ fun GardenScreen(viewModel: ForestViewModel) {
                     ) {
                         Text("Close Details", fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+        }
+    }
+
+    // Empty Plot Dialog
+    if (showEmptyPlotDialog) {
+        AlertDialog(
+            onDismissRequest = { showEmptyPlotDialog = false },
+            title = { Text("Empty Plot") },
+            text = { Text("Plant a new tree here by completing a focus session!") },
+            confirmButton = {
+                TextButton(onClick = { showEmptyPlotDialog = false }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun GardenPlot(
+    tree: GardenTree?,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSystemInDarkTheme()) Color(0xFF1B3B26) else Color(0xFFE8F5E9)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, if (isSystemInDarkTheme()) Color(0xFF2E7D32) else Color(0xFFC8E6C9))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (tree != null) {
+                TreeCanvas(species = tree.species, stage = TreeStage.MATURE)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = tree.species.displayName,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            } else {
+                // Empty garden plot with a cute daisy flower drawn on canvas
+                Canvas(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    // Center disc
+                    drawCircle(Color(0xFFFFD54F), radius = 3.dp.toPx(), center = Offset(cx, cy))
+                    // Petals
+                    for (angle in 0 until 360 step 72) {
+                        val rad = Math.toRadians(angle.toDouble())
+                        val px = cx + (5.dp.toPx() * Math.cos(rad)).toFloat()
+                        val py = cy + (5.dp.toPx() * Math.sin(rad)).toFloat()
+                        drawCircle(Color.White.copy(alpha = 0.9f), radius = 2.5f.dp.toPx(), center = Offset(px, py))
+                    }
+                    // Grass blades
+                    drawLine(
+                        color = Color(0xFF81C784),
+                        start = Offset(cx - 10.dp.toPx(), cy + 10.dp.toPx()),
+                        end = Offset(cx - 12.dp.toPx(), cy + 5.dp.toPx()),
+                        strokeWidth = 1.5f.dp.toPx()
+                    )
+                    drawLine(
+                        color = Color(0xFF81C784),
+                        start = Offset(cx - 10.dp.toPx(), cy + 10.dp.toPx()),
+                        end = Offset(cx - 8.dp.toPx(), cy + 4.dp.toPx()),
+                        strokeWidth = 1.5f.dp.toPx()
+                    )
                 }
             }
         }
