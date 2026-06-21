@@ -58,6 +58,24 @@ fun TreeCanvas(
                         size = Size(trunkWidth, trunkHeight)
                     )
 
+                    if (species == TreeSpecies.BIRCH) {
+                        // Birch bark details
+                        for (i in 1..6) {
+                            val y = groundY - (i * 12).dp.toPx()
+                            val left = i % 2 == 0
+                            drawLine(
+                                color = Color(0xFF212121),
+                                start = Offset(if (left) centerX - trunkWidth / 2 else centerX - 2.dp.toPx(), y),
+                                end = Offset(if (left) centerX + 2.dp.toPx() else centerX + trunkWidth / 2, y),
+                                strokeWidth = 2.dp.toPx()
+                            )
+                        }
+                    }
+
+                    // Main thick branches
+                    drawLine(trunkColor, Offset(centerX, groundY - 60.dp.toPx()), Offset(centerX - 25.dp.toPx(), groundY - 75.dp.toPx()), strokeWidth = 6.dp.toPx())
+                    drawLine(trunkColor, Offset(centerX, groundY - 55.dp.toPx()), Offset(centerX + 25.dp.toPx(), groundY - 72.dp.toPx()), strokeWidth = 6.dp.toPx())
+                    drawLine(trunkColor, Offset(centerX, groundY - 70.dp.toPx()), Offset(centerX + 15.dp.toPx(), groundY - 90.dp.toPx()), strokeWidth = 4.dp.toPx())
 
                     // Canopy setup
                     when (species) {
