@@ -75,6 +75,91 @@ class ForestViewModel(application: Application) : AndroidViewModel(application) 
             resetTimerToCurrentSession()
         }
     }
+
+
+    fun cancelSession() {
+        timerJob?.cancel()
+        _isTimerRunning.value = false
+        _isTimerPaused.value = false
+        
+        // ponytail: Cancelling a focus session does not advance the tree (requirement met)
+        resetTimerToCurrentSession()
+        prefs.saveTimerState(null)
+    }
+
+    private fun onSessionComplete() {
+        timerJob?.cancel()
+        _isTimerRunning.value = false
+        _isTimerPaused.value = false
+
+        triggerCompletionEffects()
+
+        val currentType = _sessionType.value
+        val config = _settings.value
+
+        if (currentType == SessionType.FOCUS) {
+            // Completed focus session - advance tree and record stats
+            val earnedMinutes = config.focusDurationMinutes
+            _totalFocusTimeInCurrentCycle.value += earnedMinutes
+            prefs.saveCycleTotalFocusMinutes(_totalFocusTimeInCurrentCycle.value)
+
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+            val updatedDates = _completedSessionDates.value.toMutableList().apply { add(todayStr) }
+            _completedSessionDates.value = updatedDates
+            prefs.saveCompletedSessions(updatedDates)
+
+            val nextCompletedCount = _completedSessionsInCycle.value + 1
+            if (nextCompletedCount >= 4) {
+                // Whole cycle complete - harvest mature tree
+                val nextCyclesCount = _pomodoroCyclesCount.value + 1
+                _pomodoroCyclesCount.value = nextCyclesCount
+                prefs.savePomodoroCyclesCount(nextCyclesCount)
+
+                val matureTree = GardenTree(
+                    species = _activeTreeSpecies.value,
+                    completionDate = todayStr,
+                    totalFocusTimeMinutes = _totalFocusTimeInCurrentCycle.value,
+                    pomodoroCycleIndex = nextCyclesCount
+                )
+                val updatedGarden = _garden.value.toMutableList().apply { add(matureTree) }
+                _garden.value = updatedGarden
+                prefs.saveGarden(updatedGarden)
+
+                // Reset cycle variables and plant next seed
+                _completedSessionsInCycle.value = 0
+                prefs.saveCycleCompletedSessions(0)
+                plantNewSeed()
+
+                // Session transition: after the fourth focus session, trigger Long Break
+                _sessionType.value = SessionType.LONG_BREAK
+                _secondsRemaining.value = config.longBreakDurationMinutes * 60L
+                if (config.autoStartBreak) {
+                    startTimer()
+                }
+            } else {
+                // Focus session complete, advance the stage
+                _completedSessionsInCycle.value = nextCompletedCount
+                prefs.saveCycleCompletedSessions(nextCompletedCount)
+
+                // Session transition: trigger Short Break
+                _sessionType.value = SessionType.SHORT_BREAK
+                _secondsRemaining.value = config.shortBreakDurationMinutes * 60L
+                if (config.autoStartBreak) {
+                    startTimer()
+                }
+            }
+        } else {
+            // Break session complete - transition back to Focus
+            _sessionType.value = SessionType.FOCUS
+            _secondsRemaining.value = config.focusDurationMinutes * 60L
+            if (config.autoStartFocus) {
+                startTimer()
+            }
+        }
+        
+        prefs.saveTimerState(null)
+    }
+
     private fun plantNewSeed() {
         val config = _settings.value
         val nextSpecies = when (config.speciesMode) {
